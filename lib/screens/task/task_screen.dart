@@ -86,21 +86,36 @@ class _TaskScreenState extends State<TaskScreen> {
         ? _selectedEmployeeSrNo!
         : loggedEmployeeSrNo!;
 
+    List<TaskModel> tasks;
+
     if (!_isDateFilterApplied) {
       ///  Call API WITHOUT date
-      return ApiService.viewTasks(
+      tasks = await ApiService.viewTasks(
         usersrno: usersrno,
         employeesrno: employeesrno,
       );
+    } else {
+      ///  Call API WITH date
+      tasks = await ApiService.viewTasks(
+        usersrno: usersrno,
+        employeesrno: employeesrno,
+        fromDate: DateFormat('dd-MM-yyyy').format(_fromDate!),
+        toDate: DateFormat('dd-MM-yyyy').format(_toDate!),
+      );
     }
 
-    ///  Call API WITH date
-    return ApiService.viewTasks(
-      usersrno: usersrno,
-      employeesrno: employeesrno,
-      fromDate: DateFormat('dd-MM-yyyy').format(_fromDate!),
-      toDate: DateFormat('dd-MM-yyyy').format(_toDate!),
-    );
+    // --- ADD SORTING HERE ---
+    tasks.sort((a, b) {
+      try {
+        final da = DateFormat('dd-MM-yyyy').parse(a.date);
+        final db = DateFormat('dd-MM-yyyy').parse(b.date);
+        return db.compareTo(da);
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    return tasks;
   }
 
   Future<void> _updateTaskStatus(TaskModel task, bool completed) async {
@@ -314,11 +329,11 @@ class _TaskScreenState extends State<TaskScreen> {
 
                 final allTasks = snapshot.data ?? [];
 
-                allTasks.sort((a, b) {
-                  final da = DateFormat('dd-MM-yyyy').parse(a.date);
-                  final db = DateFormat('dd-MM-yyyy').parse(b.date);
-                  return db.compareTo(da);
-                });
+                // allTasks.sort((a, b) {
+                //   final da = DateFormat('dd-MM-yyyy').parse(a.date);
+                //   final db = DateFormat('dd-MM-yyyy').parse(b.date);
+                //   return db.compareTo(da);
+                // });
 
                 final tasks = _searchQuery.isEmpty
                     ? allTasks
