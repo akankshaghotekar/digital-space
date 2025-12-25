@@ -28,7 +28,16 @@ class _HolidayListScreenState extends State<HolidayListScreen> {
 
     return Scaffold(
       drawer: const CommonDrawer(),
-      appBar: AppBar(centerTitle: true, title: const Text("Holiday List")),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text("Holiday List"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
+      ),
+
       body: FutureBuilder<List<HolidayModel>>(
         future: _holidayFuture,
         builder: (context, snapshot) {

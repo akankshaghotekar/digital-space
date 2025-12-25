@@ -52,9 +52,15 @@ class _AttendanceRegularizeFormState extends State<AttendanceRegularizeForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Attendance Regularize"),
         centerTitle: true,
+        title: const Text("Attendance Regularize"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
       ),
+
       body: Padding(
         padding: EdgeInsets.all(16.w),
         child: Column(

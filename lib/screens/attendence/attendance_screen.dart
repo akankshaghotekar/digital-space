@@ -198,7 +198,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         centerTitle: true,
         title: const Text("Attendance"),
         automaticallyImplyLeading: true,
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
       ),
+
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.all(16.w),

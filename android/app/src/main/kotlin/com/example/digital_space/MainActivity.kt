@@ -1,4 +1,4 @@
-package com.example.digital_space
+package com.digitalspace.digitalspace
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -6,7 +6,7 @@ class ServiceTicketModel {
   final String issueTitle;
   final String issueDetail;
   final String priority;
-  final String status;
+  String status;
 
   ServiceTicketModel({
     required this.id,

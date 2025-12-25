@@ -9,6 +9,7 @@ import 'package:digital_space/utils/media_query_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DsiScreen extends StatefulWidget {
   const DsiScreen({super.key});
@@ -22,6 +23,7 @@ class _DsiScreenState extends State<DsiScreen> {
   DateTime _toDate = DateTime.now();
   Future<List<UserModel>>? _usersFuture;
   List<UserModel> _users = [];
+  bool _isDateFilterApplied = false;
 
   Future<List<DsiModel>>? _dsiFuture;
 
@@ -31,6 +33,18 @@ class _DsiScreenState extends State<DsiScreen> {
   bool _isAdmin = true;
   String? _selectedUserSrNo;
   String? _selectedEmployeeSrNo;
+
+  Future<void> _openLink(String link) async {
+    final uri = Uri.tryParse(link);
+
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Invalid link")));
+    }
+  }
 
   @override
   void initState() {
@@ -72,22 +86,41 @@ class _DsiScreenState extends State<DsiScreen> {
     final loggedUserSrNo = await SharedPrefHelper.getUserSrNo();
     final loggedEmployeeSrNo = await SharedPrefHelper.getEmployeeSrNo();
 
-    // final usersrno = (_isAdmin && _selectedUserSrNo != null)
-    //     ? _selectedUserSrNo!
-    //     : loggedUserSrNo!;
-    // final employeesrno = (_isAdmin && _selectedEmployeeSrNo != null)
-    //     ? _selectedEmployeeSrNo!
-    //     : loggedEmployeeSrNo!;
     final usersrno = _selectedUserSrNo ?? loggedUserSrNo!;
     final employeesrno = _selectedEmployeeSrNo ?? loggedEmployeeSrNo!;
 
     return ApiService.viewDsi(
       usersrno: usersrno,
       employeesrno: employeesrno,
-      fromDate: DateFormat('dd-MM-yyyy').format(_fromDate),
-      toDate: DateFormat('dd-MM-yyyy').format(_toDate),
+      fromDate: _isDateFilterApplied
+          ? DateFormat('dd-MM-yyyy').format(_fromDate)
+          : null,
+      toDate: _isDateFilterApplied
+          ? DateFormat('dd-MM-yyyy').format(_toDate)
+          : null,
     );
   }
+
+  // Future<List<DsiModel>> _loadDsi() async {
+  //   final loggedUserSrNo = await SharedPrefHelper.getUserSrNo();
+  //   final loggedEmployeeSrNo = await SharedPrefHelper.getEmployeeSrNo();
+
+  //   // final usersrno = (_isAdmin && _selectedUserSrNo != null)
+  //   //     ? _selectedUserSrNo!
+  //   //     : loggedUserSrNo!;
+  //   // final employeesrno = (_isAdmin && _selectedEmployeeSrNo != null)
+  //   //     ? _selectedEmployeeSrNo!
+  //   //     : loggedEmployeeSrNo!;
+  //   final usersrno = _selectedUserSrNo ?? loggedUserSrNo!;
+  //   final employeesrno = _selectedEmployeeSrNo ?? loggedEmployeeSrNo!;
+
+  //   return ApiService.viewDsi(
+  //     usersrno: usersrno,
+  //     employeesrno: employeesrno,
+  //     fromDate: DateFormat('dd-MM-yyyy').format(_fromDate),
+  //     toDate: DateFormat('dd-MM-yyyy').format(_toDate),
+  //   );
+  // }
 
   Future<void> _pickFromDate() async {
     final picked = await showDatePicker(
@@ -100,10 +133,10 @@ class _DsiScreenState extends State<DsiScreen> {
       _fromDate = picked;
       if (_toDate.isBefore(_fromDate)) _toDate = _fromDate;
 
-      final future = _loadDsi();
+      _isDateFilterApplied = true;
 
       setState(() {
-        _dsiFuture = future;
+        _dsiFuture = _loadDsi();
       });
     }
   }
@@ -118,10 +151,10 @@ class _DsiScreenState extends State<DsiScreen> {
     if (picked != null) {
       _toDate = picked;
 
-      final future = _loadDsi();
+      _isDateFilterApplied = true;
 
       setState(() {
-        _dsiFuture = future;
+        _dsiFuture = _loadDsi();
       });
     }
   }
@@ -133,8 +166,13 @@ class _DsiScreenState extends State<DsiScreen> {
     return Scaffold(
       drawer: const CommonDrawer(),
       appBar: AppBar(
-        title: const Text("DSI"),
         centerTitle: true,
+        title: const Text("DSI"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -153,6 +191,7 @@ class _DsiScreenState extends State<DsiScreen> {
           ),
         ],
       ),
+
       body: Column(
         children: [
           /// SEARCH
@@ -312,7 +351,7 @@ class _DsiScreenState extends State<DsiScreen> {
               gradient: LinearGradient(
                 colors: isDark
                     ? [const Color(0xFF2563EB), const Color(0xFF1E40AF)]
-                    : [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
+                    : [AppColors.primaryBlue, AppColors.primaryBlue],
               ),
             ),
             child: Row(
@@ -352,7 +391,15 @@ class _DsiScreenState extends State<DsiScreen> {
                   children: [
                     _chip(Icons.info, dsi.status, Colors.green, isDark),
                     if (dsi.relatedTo != null && dsi.relatedTo!.isNotEmpty)
-                      _chip(Icons.link, dsi.relatedTo!, Colors.orange, isDark),
+                      GestureDetector(
+                        onTap: () => _openLink(dsi.relatedTo!),
+                        child: _chip(
+                          Icons.link,
+                          dsi.relatedTo!,
+                          Colors.orange,
+                          isDark,
+                        ),
+                      ),
                   ],
                 ),
               ],

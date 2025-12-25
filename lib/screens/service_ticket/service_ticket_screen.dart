@@ -103,13 +103,44 @@ class _ServiceTicketScreenState extends State<ServiceTicketScreen> {
     }
   }
 
+  Future<void> _updateServiceStatus(
+    ServiceTicketModel ticket,
+    bool completed,
+  ) async {
+    final newStatus = completed ? "Complete" : "Pending";
+
+    final success = await ApiService.updateServiceStatus(
+      srNo: ticket.id,
+      status: newStatus,
+    );
+
+    if (success) {
+      setState(() {
+        ticket.status = newStatus;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to update service status")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       drawer: const CommonDrawer(),
-      appBar: AppBar(title: const Text("Service Tickets"), centerTitle: true),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text("Service Tickets"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
+      ),
+
       body: Column(
         children: [
           ///  SEARCH
@@ -351,13 +382,25 @@ class _ServiceTicketScreenState extends State<ServiceTicketScreen> {
                   color: isDark ? Colors.white54 : Colors.grey,
                 ),
               ),
-              Text(
-                t.status,
-                style: TextStyle(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryBlue,
-                ),
+
+              Row(
+                children: [
+                  Text(
+                    "Complete",
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                  SizedBox(width: 6.w),
+                  Switch(
+                    value: t.status.toLowerCase() == "complete",
+                    activeColor: Colors.green,
+                    onChanged: (val) async {
+                      await _updateServiceStatus(t, val);
+                    },
+                  ),
+                ],
               ),
             ],
           ),

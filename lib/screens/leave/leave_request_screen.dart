@@ -19,7 +19,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
   final TextEditingController reasonController = TextEditingController();
   String? userSrNo;
 
-  int availableBalance = 10;
+  int availableBalance = 0;
   int lwp = 0;
   double leaveAppliedFor = 0;
 
@@ -28,6 +28,14 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
       toDate != null &&
       !toDate!.isBefore(fromDate!) &&
       reasonController.text.trim().isNotEmpty;
+
+  String _formatLeaveApplied(double val) {
+    if (val <= 0) return "--";
+    if (val == val.roundToDouble()) {
+      return "${val.toInt()} ${val > 1 ? 'days' : 'day'}";
+    }
+    return "${val.toStringAsFixed(1)} days";
+  }
 
   @override
   void initState() {
@@ -38,16 +46,30 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
     _loadUser();
   }
 
+  Future<void> _loadLeaveBalance() async {
+    if (userSrNo == null) return;
+
+    final res = await ApiService.getLeaveBalance(userSrNo!);
+    if (res != null) {
+      setState(() {
+        availableBalance = res.balance;
+      });
+    }
+  }
+
   Future<void> _loadUser() async {
     userSrNo = await SharedPrefHelper.getUserSrNo();
-    _calculateLeave();
+    await _loadLeaveBalance();
+    await _calculateLeave();
   }
 
   Future<void> _pickDate(bool isFrom) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: isFrom ? DateTime.now() : (fromDate ?? DateTime.now()),
-      firstDate: DateTime(2020),
+      initialDate: isFrom
+          ? (fromDate ?? DateTime.now())
+          : (toDate ?? fromDate ?? DateTime.now()),
+      firstDate: isFrom ? DateTime(2000) : (fromDate ?? DateTime(2000)),
       lastDate: DateTime(2100),
     );
 
@@ -55,17 +77,24 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
       setState(() {
         if (isFrom) {
           fromDate = picked;
-          toDate ??= picked;
+
+          // Auto-fix To Date
+          if (toDate == null || toDate!.isBefore(fromDate!)) {
+            toDate = fromDate;
+          }
         } else {
           toDate = picked;
         }
-        _calculateLeave();
       });
+
+      await _calculateLeave();
     }
   }
 
   Future<void> _calculateLeave() async {
     if (fromDate == null || toDate == null || userSrNo == null) return;
+
+    if (toDate!.isBefore(fromDate!)) return;
 
     final res = await ApiService.calculateLeave(
       fromDate: _format(fromDate!),
@@ -83,14 +112,26 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
     }
   }
 
-  String _format(DateTime d) => "${d.day}-${d.month}-${d.year}";
+  String _format(DateTime d) =>
+      "${d.day.toString().padLeft(2, '0')}-"
+      "${d.month.toString().padLeft(2, '0')}-"
+      "${d.year}";
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Apply Leave"), centerTitle: true),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text("Apply Leave"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
+      ),
+
       body: Padding(
         padding: EdgeInsets.all(16.w),
         child: SingleChildScrollView(
@@ -122,10 +163,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
               SizedBox(height: 14.h),
 
               _label("Leave Applied For", isDark),
-              _readonlyBox(
-                leaveAppliedFor == 0 ? "--" : "$leaveAppliedFor days",
-                isDark,
-              ),
+              _readonlyBox(_formatLeaveApplied(leaveAppliedFor), isDark),
 
               SizedBox(height: 14.h),
 
@@ -230,11 +268,10 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
           "Yes",
           "No",
         ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-        onChanged: (val) {
-          setState(() {
-            halfDay = val!;
-            _calculateLeave();
-          });
+        onChanged: (val) async {
+          if (val == null) return;
+          setState(() => halfDay = val);
+          await _calculateLeave();
         },
       ),
     ),

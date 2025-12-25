@@ -1,6 +1,7 @@
 import 'package:digital_space/api/api_service.dart';
 import 'package:digital_space/model/user_model/user_model.dart';
 import 'package:digital_space/sharedpref/shared_pref_helper.dart';
+import 'package:digital_space/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -71,7 +72,16 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(centerTitle: true, title: const Text("Add Task")),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text("Add Task"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
+      ),
+
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.all(16.w),
@@ -120,7 +130,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     return DropdownButtonFormField<String>(
                       value: _fromUserSrNo,
                       decoration: const InputDecoration(
-                        labelText: "Assign From",
+                        labelText: "Assign To",
                         border: OutlineInputBorder(),
                       ),
                       items: users

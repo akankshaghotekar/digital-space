@@ -21,8 +21,10 @@ class _TaskScreenState extends State<TaskScreen> {
   Future<List<TaskModel>>? _taskFuture;
   String? _expandedTaskSrNo;
 
-  DateTime _fromDate = DateTime.now();
-  DateTime _toDate = DateTime.now();
+  DateTime? _fromDate;
+  DateTime? _toDate;
+
+  bool _isDateFilterApplied = false;
 
   Future<List<UserModel>>? _usersFuture;
 
@@ -55,32 +57,75 @@ class _TaskScreenState extends State<TaskScreen> {
     });
   }
 
+  Future<void> _markTaskSeenIfNew(TaskModel task) async {
+    final status = task.status.trim().toLowerCase();
+
+    if (status != "new task") return;
+
+    final success = await ApiService.updateTaskStatus(
+      srNo: task.srNo,
+      status: "Pending",
+    );
+
+    if (success) {
+      setState(() {
+        task.status = "Pending";
+      });
+    }
+  }
+
   Future<List<TaskModel>> _loadTasks() async {
     final loggedUserSrNo = await SharedPrefHelper.getUserSrNo();
     final loggedEmployeeSrNo = await SharedPrefHelper.getEmployeeSrNo();
 
-    final from = DateFormat('dd-MM-yyyy').format(_fromDate);
-    final to = DateFormat('dd-MM-yyyy').format(_toDate);
-
     final usersrno = (_isAdmin && _selectedUserSrNo != null)
         ? _selectedUserSrNo!
         : loggedUserSrNo!;
+
     final employeesrno = (_isAdmin && _selectedEmployeeSrNo != null)
         ? _selectedEmployeeSrNo!
         : loggedEmployeeSrNo!;
 
+    if (!_isDateFilterApplied) {
+      ///  Call API WITHOUT date
+      return ApiService.viewTasks(
+        usersrno: usersrno,
+        employeesrno: employeesrno,
+      );
+    }
+
+    ///  Call API WITH date
     return ApiService.viewTasks(
       usersrno: usersrno,
       employeesrno: employeesrno,
-      fromDate: from,
-      toDate: to,
+      fromDate: DateFormat('dd-MM-yyyy').format(_fromDate!),
+      toDate: DateFormat('dd-MM-yyyy').format(_toDate!),
     );
+  }
+
+  Future<void> _updateTaskStatus(TaskModel task, bool completed) async {
+    final newStatus = completed ? "Complete" : "Pending";
+
+    final success = await ApiService.updateTaskStatus(
+      srNo: task.srNo,
+      status: newStatus,
+    );
+
+    if (success) {
+      setState(() {
+        task.status = newStatus;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to update task status")),
+      );
+    }
   }
 
   Future<void> _pickFromDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _fromDate,
+      initialDate: _fromDate ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
@@ -88,7 +133,8 @@ class _TaskScreenState extends State<TaskScreen> {
     if (picked != null) {
       setState(() {
         _fromDate = picked;
-        if (_toDate.isBefore(_fromDate)) _toDate = _fromDate;
+        _toDate ??= picked;
+        _isDateFilterApplied = true;
         _taskFuture = _loadTasks();
       });
     }
@@ -97,19 +143,17 @@ class _TaskScreenState extends State<TaskScreen> {
   Future<void> _pickToDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _toDate,
-      firstDate: _fromDate,
+      initialDate: _toDate ?? (_fromDate ?? DateTime.now()),
+      firstDate: _fromDate ?? DateTime(2020),
       lastDate: DateTime(2100),
     );
 
     if (picked != null) {
       setState(() {
-        _fromDate = picked;
-        if (_toDate.isBefore(_fromDate)) _toDate = _fromDate;
+        _toDate = picked;
+        _isDateFilterApplied = true;
+        _taskFuture = _loadTasks();
       });
-
-      _taskFuture = _loadTasks();
-      setState(() {});
     }
   }
 
@@ -122,6 +166,11 @@ class _TaskScreenState extends State<TaskScreen> {
       appBar: AppBar(
         centerTitle: true,
         title: const Text("Tasks"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -138,6 +187,7 @@ class _TaskScreenState extends State<TaskScreen> {
           ),
         ],
       ),
+
       body: Column(
         children: [
           /// SEARCH
@@ -342,47 +392,51 @@ class _TaskScreenState extends State<TaskScreen> {
   }
 
   Widget _taskCard(TaskModel task) {
-    final isUrgent = task.taskPriority.toLowerCase() == "urgent";
-
     final isExpanded = _expandedTaskSrNo == task.srNo;
+    final isUrgent = task.taskPriority.toLowerCase() == "urgent";
+    final isComplete = task.status.toLowerCase() == "complete";
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return InkWell(
       borderRadius: BorderRadius.circular(16.r),
-      onTap: () {
+      onTap: () async {
+        final willExpand = !isExpanded;
+
         setState(() {
-          _expandedTaskSrNo = isExpanded ? null : task.srNo;
+          _expandedTaskSrNo = willExpand ? task.srNo : null;
         });
+
+        if (willExpand) {
+          await _markTaskSeenIfNew(task);
+        }
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 250),
         padding: EdgeInsets.all(14.w),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isUrgent
-                ? [const Color(0xFFFF7280), const Color(0xFFEA3030)]
-                : [const Color(0xFFFFC774), const Color(0xFFFDAC32)],
-          ),
+          color: isDark ? AppColors.darkCard : Colors.white,
           borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: isDark ? Colors.white12 : Colors.grey.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// HEADER ROW
+            /// HEADER
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircularPercentIndicator(
-                  radius: 26.r,
-                  lineWidth: 4.w,
-                  percent: 0.0,
-                  progressColor: Colors.white,
-                  backgroundColor: Colors.white24,
-                  center: Text(
-                    "0%",
-                    style: TextStyle(color: Colors.white, fontSize: 11.sp),
-                  ),
-                ),
-                SizedBox(width: 14.w),
+                /// Title + Assigned
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,34 +446,63 @@ class _TaskScreenState extends State<TaskScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white,
                           fontSize: 15.sp,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black,
                         ),
                       ),
                       SizedBox(height: 4.h),
                       Text(
-                        "Assigned by: ${task.assignedFrom}",
+                        "Assigned to ${task.assignedFrom}",
                         style: TextStyle(
-                          color: Colors.white70,
                           fontSize: 12.sp,
+                          color: isDark ? Colors.white60 : Colors.grey.shade600,
                         ),
                       ),
                     ],
                   ),
                 ),
+
+                /// Priority Badge
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10.w,
+                    vertical: 4.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isUrgent
+                        ? (isDark
+                              ? Colors.red.withOpacity(0.2)
+                              : Colors.red.shade50)
+                        : (isDark
+                              ? Colors.orange.withOpacity(0.2)
+                              : Colors.orange.shade50),
+                    borderRadius: BorderRadius.circular(20.r),
+                  ),
+                  child: Text(
+                    task.taskPriority.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.bold,
+                      color: isUrgent ? Colors.redAccent : Colors.orangeAccent,
+                    ),
+                  ),
+                ),
+
+                SizedBox(width: 6.w),
+
                 Icon(
                   isExpanded
                       ? Icons.keyboard_arrow_up
                       : Icons.keyboard_arrow_down,
-                  color: Colors.white,
+                  color: isDark ? Colors.white70 : Colors.grey.shade600,
                 ),
               ],
             ),
 
             /// EXPANDED CONTENT
             AnimatedSize(
-              duration: const Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 250),
               curve: Curves.easeInOut,
               child: isExpanded
                   ? Padding(
@@ -429,14 +512,80 @@ class _TaskScreenState extends State<TaskScreen> {
                         children: [
                           _detailRow("Description", task.taskDetail),
                           SizedBox(height: 6.h),
-                          _detailRow("Priority", task.taskPriority),
-
-                          SizedBox(height: 6.h),
                           _detailRow("Date", task.date),
                           SizedBox(height: 6.h),
-                          _detailRow(
-                            "Status",
-                            task.status.replaceAll("\n", " "),
+
+                          /// Status Chip
+                          Row(
+                            children: [
+                              Text(
+                                "Status:",
+                                style: TextStyle(
+                                  fontSize: 12.sp,
+                                  color: isDark
+                                      ? Colors.white60
+                                      : Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(width: 8.w),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 10.w,
+                                  vertical: 4.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isComplete
+                                      ? (isDark
+                                            ? Colors.green.withOpacity(0.2)
+                                            : Colors.green.shade50)
+                                      : (isDark
+                                            ? Colors.blue.withOpacity(0.2)
+                                            : Colors.blue.shade50),
+                                  borderRadius: BorderRadius.circular(20.r),
+                                ),
+                                child: Text(
+                                  task.status.replaceAll("\n", " "),
+                                  style: TextStyle(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: isComplete
+                                        ? Colors.greenAccent
+                                        : Colors.blueAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          SizedBox(height: 12.h),
+                          Divider(
+                            color: isDark
+                                ? Colors.white12
+                                : Colors.grey.shade300,
+                          ),
+                          SizedBox(height: 6.h),
+
+                          /// Switch
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Mark as Completed",
+                                style: TextStyle(
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              Switch(
+                                value: isComplete,
+                                activeColor: Colors.green,
+                                onChanged: (val) async {
+                                  await _updateTaskStatus(task, val);
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -450,6 +599,8 @@ class _TaskScreenState extends State<TaskScreen> {
   }
 
   Widget _detailRow(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -458,7 +609,7 @@ class _TaskScreenState extends State<TaskScreen> {
           child: Text(
             "$label:",
             style: TextStyle(
-              color: Colors.white70,
+              color: isDark ? Colors.white70 : Colors.black,
               fontSize: 12.sp,
               fontWeight: FontWeight.w600,
             ),
@@ -467,7 +618,10 @@ class _TaskScreenState extends State<TaskScreen> {
         Expanded(
           child: Text(
             value,
-            style: TextStyle(color: Colors.white, fontSize: 12.sp),
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+              fontSize: 12.sp,
+            ),
           ),
         ),
       ],
@@ -476,7 +630,7 @@ class _TaskScreenState extends State<TaskScreen> {
 
   Widget _dateCard(
     String label,
-    DateTime date,
+    DateTime? date,
     VoidCallback onTap,
     bool isDark,
   ) {
@@ -502,7 +656,9 @@ class _TaskScreenState extends State<TaskScreen> {
             ),
             SizedBox(height: 4.h),
             Text(
-              DateFormat('dd MMM yyyy').format(date),
+              date == null
+                  ? "Select date"
+                  : DateFormat('dd MMM yyyy').format(date),
               style: TextStyle(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.bold,

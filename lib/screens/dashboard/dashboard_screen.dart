@@ -1,4 +1,6 @@
 import 'package:digital_space/api/api_service.dart';
+import 'package:digital_space/model/progress/progress_status_model.dart';
+import 'package:digital_space/model/project_model/project_model.dart';
 import 'package:digital_space/model/task_model/task_model.dart';
 import 'package:digital_space/screens/task/task_screen.dart';
 import 'package:digital_space/sharedpref/shared_pref_helper.dart';
@@ -21,6 +23,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _userName = "";
   Future<List<TaskModel>>? _urgentTaskFuture;
   final String todayDate = DateFormat('dd MMM').format(DateTime.now());
+  Future<List<ProjectModel>>? _activeProjectsFuture;
+  Future<ProgressStatusModel?>? _progressFuture;
 
   final List<List<Color>> activeProjectGradientsLight = [
     [const Color(0xFFB1CFFF), const Color(0xFF729CFD)],
@@ -39,10 +43,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     [const Color(0xFF4C1D95), const Color(0xFF5B21B6)],
   ];
   @override
+  @override
   void initState() {
     super.initState();
     _loadUserName();
     _urgentTaskFuture = _loadUrgentTasks();
+    _activeProjectsFuture = ApiService.getActiveProjects();
+    _progressFuture = _loadProgress();
+  }
+
+  Future<ProgressStatusModel?> _loadProgress() async {
+    final userSrNo = await SharedPrefHelper.getUserSrNo();
+    if (userSrNo == null) return null;
+
+    return ApiService.getProgressStatus(userSrNo: userSrNo);
   }
 
   Future<void> _loadUserName() async {
@@ -58,17 +72,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final usersrno = await SharedPrefHelper.getUserSrNo();
     final employeesrno = await SharedPrefHelper.getEmployeeSrNo();
 
-    final today = DateFormat('dd-MM-yyyy').format(DateTime.now());
-
     final tasks = await ApiService.viewTasks(
       usersrno: usersrno!,
       employeesrno: employeesrno!,
-      fromDate: today,
-      toDate: today,
     );
 
-    // Only urgent tasks
-    return tasks.where((e) => e.taskPriority == "IU").toList();
+    return tasks
+        .where((e) => e.taskPriority.toLowerCase() == "urgent")
+        .toList();
   }
 
   @override
@@ -80,7 +91,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         automaticallyImplyLeading: true,
         centerTitle: true,
-
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.light_mode),
@@ -88,6 +103,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -95,6 +111,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                SizedBox(height: 20.h),
+
                 /// Header
                 Text(
                   "Hi, $_userName\nBe productive today",
@@ -151,18 +169,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ),
                             SizedBox(height: 6.h),
-                            Text(
-                              "30/40 task done",
-                              style: TextStyle(
-                                fontSize: 13.sp,
-                                color: Colors.grey,
-                              ),
-                            ),
+                            // Text(
+                            //   "30/40 task done",
+                            //   style: TextStyle(
+                            //     fontSize: 13.sp,
+                            //     color: Colors.grey,
+                            //   ),
+                            // ),
                             SizedBox(height: 6.h),
                             Container(
                               padding: EdgeInsets.symmetric(
-                                horizontal: 10.w,
-                                vertical: 4.h,
+                                horizontal: 20.w,
+                                vertical: 6.h,
                               ),
                               decoration: BoxDecoration(
                                 color: AppColors.primaryBlue,
@@ -177,12 +195,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         CircularPercentIndicator(
                           radius: 40.r,
-                          percent: 0.8,
+
                           lineWidth: 6.w,
                           progressColor: AppColors.primaryBlue,
-                          center: Text(
-                            "80%",
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                          center: FutureBuilder<ProgressStatusModel?>(
+                            future: _progressFuture,
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return CircularPercentIndicator(
+                                  radius: 40.r,
+                                  percent: 0.0,
+                                  lineWidth: 6.w,
+                                  progressColor: AppColors.primaryBlue,
+                                  center: const Text("0%"),
+                                );
+                              }
+
+                              final progress = snapshot.data!;
+
+                              return CircularPercentIndicator(
+                                radius: 40.r,
+                                percent: progress.progress.clamp(0.0, 1.0),
+                                lineWidth: 6.w,
+                                progressColor: AppColors.primaryBlue,
+                                center: Text(
+                                  progress.progressText,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -232,7 +275,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           return _urgentTaskCard(
                             context,
                             title: task.taskName,
-                            deadline: task.date ?? "Today",
+                            deadline: task.date,
                           );
                         },
                       );
@@ -255,16 +298,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 SizedBox(
                   height: 150.h,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: 2,
-                    separatorBuilder: (_, __) => SizedBox(width: 12.w),
-                    itemBuilder: (context, index) {
-                      return _activeProjectCard(
-                        context,
-                        title: "Face Recognition App ${index + 1}",
-                        progress: 0.65 - (index * 0.1),
-                        gradientIndex: index,
+                  child: FutureBuilder<List<ProjectModel>>(
+                    future: _activeProjectsFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final projects = snapshot.data ?? [];
+
+                      if (projects.isEmpty) {
+                        return Center(
+                          child: Text(
+                            "No active projects",
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        );
+                      }
+
+                      return ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: projects.length,
+                        separatorBuilder: (_, __) => SizedBox(width: 12.w),
+                        itemBuilder: (context, index) {
+                          final project = projects[index];
+
+                          return _activeProjectCard(
+                            context,
+                            title: project.projectName,
+                            progress: 0.6 + (index * 0.05),
+                            gradientIndex: index,
+                          );
+                        },
                       );
                     },
                   ),
@@ -345,15 +410,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       width: 220.w,
       padding: EdgeInsets.all(14.w),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF3A1C1C), const Color(0xFF5C2323)]
-              : [const Color(0xFFFFADAD), const Color(0xFFFF5757)],
-        ),
+        color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.redAccent.withOpacity(0.25),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -362,36 +426,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          /// Urgent badge
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
             decoration: BoxDecoration(
-              color: Colors.redAccent,
-              borderRadius: BorderRadius.circular(12.r),
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(20.r),
             ),
-            child: const Text(
+            child: Text(
               "URGENT",
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 11,
+                fontSize: 11.sp,
                 fontWeight: FontWeight.bold,
+                color: Colors.red.shade700,
               ),
             ),
           ),
+
           SizedBox(height: 10.h),
+
+          /// Title
           Text(
             title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 15.sp,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
               color: isDark ? Colors.white : Colors.black,
             ),
           ),
+
           const Spacer(),
+
+          /// Deadline
           Text(
             "Deadline: $deadline",
             style: TextStyle(
               fontSize: 13.sp,
-              color: isDark ? Colors.white70 : Colors.black54,
+              color: isDark ? Colors.white70 : Colors.grey.shade600,
             ),
           ),
         ],
@@ -407,25 +480,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final gradientColors = isDark
-        ? activeProjectGradientsDark[gradientIndex %
-              activeProjectGradientsDark.length]
-        : activeProjectGradientsLight[gradientIndex %
-              activeProjectGradientsLight.length];
-
     return Container(
       width: 240.w,
       padding: EdgeInsets.all(14.w),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: gradientColors,
-        ),
+        color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
+        ),
         boxShadow: [
           BoxShadow(
-            color: gradientColors.last.withOpacity(0.25),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -434,41 +500,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// Project Title
+          /// Project title
           Text(
             title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 16.sp,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
               color: isDark ? Colors.white : Colors.black,
             ),
           ),
 
           SizedBox(height: 14.h),
 
-          /// Progress Bar
+          /// Progress bar
           ClipRRect(
             borderRadius: BorderRadius.circular(10.r),
             child: LinearProgressIndicator(
-              value: progress,
+              value: progress.clamp(0.0, 1.0),
               minHeight: 8.h,
-              backgroundColor: isDark ? Colors.white24 : Colors.black12,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isDark ? Colors.lightBlueAccent : AppColors.primaryBlue,
-              ),
+              backgroundColor: isDark ? Colors.white24 : Colors.grey.shade200,
+              valueColor: const AlwaysStoppedAnimation(AppColors.primaryBlue),
             ),
           ),
 
-          SizedBox(height: 10.h),
+          SizedBox(height: 8.h),
 
-          /// Progress Text
+          /// Progress text
           Text(
             "${(progress * 100).toInt()}% completed",
             style: TextStyle(
               fontSize: 13.sp,
-              color: isDark ? Colors.white70 : Colors.black54,
+              color: isDark ? Colors.white70 : Colors.grey.shade600,
             ),
           ),
         ],

@@ -5,7 +5,7 @@ class TaskModel {
   final String taskDetail;
   final String taskPriority;
   final String assignedFrom;
-  final String status;
+  String status;
 
   TaskModel({
     required this.srNo,

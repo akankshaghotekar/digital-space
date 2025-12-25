@@ -106,7 +106,16 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(centerTitle: true, title: const Text("Attendance Report")),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text("Attendance Report"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
+      ),
+
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.all(16.w),

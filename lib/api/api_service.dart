@@ -7,6 +7,8 @@ import 'package:digital_space/model/holiday_model/holiday_model.dart';
 import 'package:digital_space/model/leave_model/leave_balance_model.dart';
 import 'package:digital_space/model/leave_model/leave_calculation_model.dart';
 import 'package:digital_space/model/leave_model/leave_view_model.dart';
+import 'package:digital_space/model/progress/progress_status_model.dart';
+import 'package:digital_space/model/project_model/project_model.dart';
 import 'package:digital_space/model/service_ticket_model.dart/service_ticket_model.dart';
 import 'package:digital_space/model/task_model/task_model.dart';
 import 'package:digital_space/model/user_model/user_model.dart';
@@ -207,15 +209,21 @@ class ApiService {
   static Future<List<TaskModel>> viewTasks({
     required String usersrno,
     required String employeesrno,
-    required String fromDate,
-    required String toDate,
+    String? fromDate,
+    String? toDate,
   }) async {
-    final res = await _postRequest(ApiConfig.viewTask, {
+    final Map<String, String> body = {
       "usersrno": usersrno,
       "employeesrno": employeesrno,
-      "from_date": fromDate,
-      "to_date": toDate,
-    });
+    };
+
+    /// Add dates ONLY if selected
+    if (fromDate != null && toDate != null) {
+      body["from_date"] = fromDate;
+      body["to_date"] = toDate;
+    }
+
+    final res = await _postRequest(ApiConfig.viewTask, body);
 
     if (res["status"] == 0 && res["data"] != null) {
       return (res["data"] as List).map((e) => TaskModel.fromJson(e)).toList();
@@ -261,15 +269,20 @@ class ApiService {
   static Future<List<DsiModel>> viewDsi({
     required String usersrno,
     required String employeesrno,
-    required String fromDate,
-    required String toDate,
+    String? fromDate,
+    String? toDate,
   }) async {
-    final res = await _postRequest(ApiConfig.viewDsi, {
+    final Map<String, String> body = {
       "usersrno": usersrno,
       "employeesrno": employeesrno,
-      "from_date": fromDate,
-      "to_date": toDate,
-    });
+    };
+
+    if (fromDate != null && toDate != null) {
+      body["from_date"] = fromDate;
+      body["to_date"] = toDate;
+    }
+
+    final res = await _postRequest(ApiConfig.viewDsi, body);
 
     if (res["status"] == 0 && res["data"] != null) {
       return (res["data"] as List).map((e) => DsiModel.fromJson(e)).toList();
@@ -317,5 +330,63 @@ class ApiService {
       return (res['data'] as List).map((e) => UserModel.fromJson(e)).toList();
     }
     return [];
+  }
+
+  static Future<bool> updateTaskStatus({
+    required String srNo,
+    required String status,
+  }) async {
+    final uri = Uri.parse(
+      "https://digitalspaceinc.com/digitalspace/ws/updatetaskstatus.php",
+    ).replace(queryParameters: {"srno": srNo, "status": status});
+
+    try {
+      final response = await http.post(uri);
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        return json["status"] == 0;
+      }
+    } catch (e) {
+      return false;
+    }
+
+    return false;
+  }
+
+  static Future<List<ProjectModel>> getActiveProjects() async {
+    final res = await _postRequest(ApiConfig.getActiveProjects, {});
+
+    if (res['status'] == 0 && res['data'] != null) {
+      return (res['data'] as List)
+          .map((e) => ProjectModel.fromJson(e))
+          .toList();
+    }
+    return [];
+  }
+
+  static Future<ProgressStatusModel?> getProgressStatus({
+    required String userSrNo,
+  }) async {
+    final res = await _postRequest(ApiConfig.getProgressStatus, {
+      'usersrno': userSrNo,
+    });
+
+    if (res['status'] == 0) {
+      return ProgressStatusModel.fromJson(res);
+    }
+    return null;
+  }
+
+  static Future<bool> updateServiceStatus({
+    required String srNo,
+    required String status,
+  }) async {
+    final res = await _postRequest(ApiConfig.updateServiceStatus, {
+      "srno": srNo,
+      "status": status,
+    });
+
+    return res["status"] == 0;
   }
 }

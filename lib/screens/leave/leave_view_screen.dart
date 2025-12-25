@@ -106,6 +106,11 @@ class _LeaveViewScreenState extends State<LeaveViewScreen> {
       appBar: AppBar(
         centerTitle: true,
         title: const Text("Leave View"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -118,6 +123,7 @@ class _LeaveViewScreenState extends State<LeaveViewScreen> {
           ),
         ],
       ),
+
       body: Padding(
         padding: EdgeInsets.all(16.w),
         child: Column(

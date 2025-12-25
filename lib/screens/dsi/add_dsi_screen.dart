@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:digital_space/api/api_service.dart';
 import 'package:digital_space/sharedpref/shared_pref_helper.dart';
+import 'package:digital_space/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
@@ -73,7 +74,16 @@ class _AddDsiScreenState extends State<AddDsiScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Add DSI"), centerTitle: true),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text("Add DSI"),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
+      ),
+
       body: Padding(
         padding: EdgeInsets.all(16.w),
         child: Form(

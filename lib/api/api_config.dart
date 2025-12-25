@@ -19,4 +19,7 @@ class ApiConfig {
   static const String holidayList = "${baseUrl}holidayList.php";
   static const String viewService = "${baseUrl}viewservice.php";
   static const String getUsers = "${baseUrl}getusers.php";
+  static const String getActiveProjects = "${baseUrl}getactiveprojects.php";
+  static const String getProgressStatus = "${baseUrl}getprogressstatus.php";
+  static const String updateServiceStatus = "${baseUrl}updateservicestatus.php";
 }

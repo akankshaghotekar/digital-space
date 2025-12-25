@@ -1,10 +1,25 @@
+import 'package:digital_space/api/api_service.dart';
+import 'package:digital_space/model/project_model/project_model.dart';
 import 'package:digital_space/utils/app_colors.dart';
 import 'package:digital_space/utils/common/common_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-class ActiveProjectScreen extends StatelessWidget {
+class ActiveProjectScreen extends StatefulWidget {
   const ActiveProjectScreen({super.key});
+
+  @override
+  State<ActiveProjectScreen> createState() => _ActiveProjectScreenState();
+}
+
+class _ActiveProjectScreenState extends State<ActiveProjectScreen> {
+  Future<List<ProjectModel>>? _projectFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _projectFuture = ApiService.getActiveProjects();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,9 +28,16 @@ class ActiveProjectScreen extends StatelessWidget {
     return Scaffold(
       drawer: const CommonDrawer(),
       appBar: AppBar(
+        centerTitle: true,
         title: const Text("Active Projects"),
         automaticallyImplyLeading: true,
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? AppColors.primaryBlue
+            : null,
+        foregroundColor: Colors.white,
+        elevation: Theme.of(context).brightness == Brightness.light ? 2 : 0,
       ),
+
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.all(16.w),
@@ -23,9 +45,9 @@ class ActiveProjectScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ///  Overall Progress Card
-              _overallProgressCard(isDark),
+              // _overallProgressCard(isDark),
 
-              SizedBox(height: 24.h),
+              // SizedBox(height: 24.h),
 
               ///  Section title
               Text(
@@ -37,15 +59,31 @@ class ActiveProjectScreen extends StatelessWidget {
 
               /// Project list
               Expanded(
-                child: ListView.separated(
-                  itemCount: 4,
-                  separatorBuilder: (_, __) => SizedBox(height: 14.h),
-                  itemBuilder: (context, index) {
-                    return _projectCard(
-                      context,
-                      index: index,
-                      title: "Project ${index + 1}",
-                      progress: 0.25 + (index * 0.2),
+                child: FutureBuilder<List<ProjectModel>>(
+                  future: _projectFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final projects = snapshot.data ?? [];
+
+                    if (projects.isEmpty) {
+                      return const Center(child: Text("No active projects"));
+                    }
+
+                    return ListView.separated(
+                      itemCount: projects.length,
+                      separatorBuilder: (_, __) => SizedBox(height: 14.h),
+                      itemBuilder: (context, index) {
+                        final project = projects[index];
+                        return _projectCard(
+                          context,
+                          index: index,
+                          title: project.projectName,
+                          progress: 0.4 + (index * 0.1), // dummy progress
+                        );
+                      },
                     );
                   },
                 ),
@@ -119,36 +157,17 @@ class ActiveProjectScreen extends StatelessWidget {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final gradientsLight = [
-      [const Color(0xFFE3F2FD), const Color(0xFFBBDEFB)],
-      [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
-      [const Color(0xFFFFF3E0), const Color(0xFFFFE0B2)],
-      [const Color(0xFFF3E5F5), const Color(0xFFE1BEE7)],
-    ];
-
-    final gradientsDark = [
-      [const Color(0xFF1E3A8A), const Color(0xFF312E81)],
-      [const Color(0xFF064E3B), const Color(0xFF065F46)],
-      [const Color(0xFF7C2D12), const Color(0xFF9A3412)],
-      [const Color(0xFF4C1D95), const Color(0xFF5B21B6)],
-    ];
-
-    final colors = isDark
-        ? gradientsDark[index % gradientsDark.length]
-        : gradientsLight[index % gradientsLight.length];
-
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: colors,
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
         ),
-        borderRadius: BorderRadius.circular(18.r),
         boxShadow: [
           BoxShadow(
-            color: colors.last.withOpacity(0.25),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -160,9 +179,11 @@ class ActiveProjectScreen extends StatelessWidget {
           /// Project name
           Text(
             title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 16.sp,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
               color: isDark ? Colors.white : Colors.black,
             ),
           ),
@@ -173,15 +194,15 @@ class ActiveProjectScreen extends StatelessWidget {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.2),
+              color: AppColors.primaryBlue.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20.r),
             ),
             child: Text(
               "IN PROGRESS",
               style: TextStyle(
                 fontSize: 11.sp,
-                color: Colors.white,
                 fontWeight: FontWeight.bold,
+                color: AppColors.primaryBlue,
               ),
             ),
           ),
@@ -194,10 +215,8 @@ class ActiveProjectScreen extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress.clamp(0.0, 1.0),
               minHeight: 8.h,
-              backgroundColor: isDark ? Colors.white24 : Colors.black12,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isDark ? Colors.lightBlueAccent : AppColors.primaryBlue,
-              ),
+              backgroundColor: isDark ? Colors.white24 : Colors.grey.shade200,
+              valueColor: const AlwaysStoppedAnimation(AppColors.primaryBlue),
             ),
           ),
 
@@ -208,7 +227,7 @@ class ActiveProjectScreen extends StatelessWidget {
             "${(progress * 100).toInt()}% completed",
             style: TextStyle(
               fontSize: 13.sp,
-              color: isDark ? Colors.white70 : Colors.black54,
+              color: isDark ? Colors.white70 : Colors.grey.shade600,
             ),
           ),
         ],
